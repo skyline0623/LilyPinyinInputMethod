@@ -27,14 +27,30 @@ class Node implements Serializable{
 	ArrayList<Node> children = new ArrayList<Node>();
 	ArrayList<Character> chLetters = new ArrayList<Character>();
 }
-public class TrieTree implements Serializable{
+public class TrieTree implements Serializable {
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 	private Node root;
 	static String TREE_PATH;
-	public TrieTree(){
+	private static TrieTree INSTANCE = null;
+	public static TrieTree getInstance(boolean isBuilding){
+		if(TrieTree.INSTANCE == null){
+			if(isBuilding){
+				TrieTree.INSTANCE = new TrieTree(true);
+			}
+			else if(Running.Process.isFromJar()){
+				TrieTree.INSTANCE = TrieTree.restoreTreeFromJar();
+			}
+			else{
+				TrieTree.INSTANCE = TrieTree.restroreTree();
+			}
+		}
+		return INSTANCE;
+	}
+	private TrieTree(){}
+	private TrieTree(boolean is){
 		root = new Node();
 		Properties prop = new Properties();
 		try {
@@ -82,7 +98,7 @@ public class TrieTree implements Serializable{
 			}
 		}
 	}
-	public Iterator<Word> get(String py)  {
+	public SortedList get(String py)  {
 		Node curr = this.root;
 		for(int i = 0; i < py.length(); i++){
 			char letter = py.charAt(i);
@@ -90,7 +106,7 @@ public class TrieTree implements Serializable{
 			if(curr.children != null && (index = curr.chLetters.indexOf(letter)) != -1){
 				curr = curr.children.get(index);
 				if(i == py.length() - 1){
-					return curr.candidates.iterator();
+					return curr.candidates;
 				}
 			}
 			else{
@@ -98,6 +114,27 @@ public class TrieTree implements Serializable{
 			}
 		}  
 		return null;
+	}
+	public int costs(String py){
+		Node curr = this.root;
+		for(int i = 0; i < py.length(); i++){
+			char letter = py.charAt(i);
+			int index;
+			if(curr.children != null && (index = curr.chLetters.indexOf(letter)) != -1){
+				curr = curr.children.get(index);
+				if(i == py.length() - 1){
+					if(curr.isPinyin)
+						return 0;
+					else{
+						return 1;
+					}
+				}
+			}
+			else{
+				return 2;
+			}
+		}  
+		return 2;
 	}
 	public Iterator<Word> getLegal(String py){
 		Node curr = this.root;
@@ -136,7 +173,7 @@ public class TrieTree implements Serializable{
 		}
 	}
 	
-	public static TrieTree restroreTree(){
+	private static TrieTree restroreTree(){
 		try{
 			Properties prop = new Properties();
 			prop.load(new BufferedReader(new InputStreamReader(new FileInputStream(new File("src/conf.properties")))));
@@ -154,10 +191,10 @@ public class TrieTree implements Serializable{
 		}
 		return null;
 	}
-	public TrieTree restoreTreeFromJar(){
+	private static TrieTree restoreTreeFromJar(){
 		try{
 			 TREE_PATH = "trained_tree.obj";
-			 InputStream is= this.getClass().getResourceAsStream(TREE_PATH); 
+			 InputStream is= new TrieTree().getClass().getResourceAsStream(TREE_PATH); 
 			 ObjectInputStream ois = new ObjectInputStream(is);  
 			 TrieTree tree = (TrieTree)ois.readObject();
 			 ois.close();
@@ -174,25 +211,6 @@ public class TrieTree implements Serializable{
 	}
 	
 	public static void main(String[] args){
-		TrieTree t = new TrieTree();
-		t.add("mao", 'Ã«');
-		t.add("mao", 'Ã«');
-		t.add("mao", 'ºÅ');
-		t.add("mao", 'ºÀ');
-		t.add("man", 'ÀÁ');
-		t.add("mao", 'ºÀ');
-		t.add("mao", 'ºÀ');
-		t.add("mao", 'ºÆ');
-		t.add("ma", '¹þ');
-		t.add("ma", '¹þ');
-		t.add("ma", '¹þ');
-		t.add("ma", '¹þ');
-		t.add("ma", '¹þ');
-		t.add("muang", '»Æ');
-		t.add("muang", '»Æ');
-		Iterator<Word> iter = t.get("m");
-		while(iter.hasNext()){
-			System.out.print(iter.next() + " ");
-		}
+		restoreTreeFromJar();
 	}
 }

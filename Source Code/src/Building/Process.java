@@ -9,7 +9,7 @@ import java.util.Properties;
 
 
 public class Process {
-	static TrieTree TREE = new TrieTree();
+	static TrieTree TREE = TrieTree.getInstance(true);
 	static String pyWPath;
 	static String corpusPath;
 	public static void building(){
@@ -26,8 +26,23 @@ public class Process {
 		ReadCorpus.readCorpus(corpusPath);
 		TrieTree.storeTree(TREE);
 	}
+	public static void buildingV2(){
+		Properties prop = new Properties();
+		try {
+			prop.load(new BufferedReader(new InputStreamReader(new FileInputStream(new File("src/conf.properties")))));
+			pyWPath = prop.getProperty("py_word_map_path");
+			corpusPath = prop.getProperty("corpus_path");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		ReadCorpusV2.readCorpusV2();
+		TransitionMatrixFromFile.getInstance(true).storeMatrix();
+	}
 	public static void main(String[] args) throws IOException{
+//		WeiboCorpus.readXML("weibo corpus.xml", "SogouC.reduced/Reduced/Weibo/weibo.txt");
 		Process.building();
+		Process.buildingV2();
 		
 		/*TREE = TrieTree.restroreTree();  
 		while(true){

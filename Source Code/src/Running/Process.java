@@ -2,86 +2,125 @@ package Running;
 
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.AbstractMap.SimpleEntry;
+import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Map.Entry;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.PriorityQueue;
 
+import Building.TransitionMatrixFromFile;
+import Building.ConfusionMatrixHere;
 import Building.TrieTree;
+import Running.HMModel.HMModel;
+import Running.PYSeparator.PYSeparator;
+import Running.PYSeparator.Separator;
+
+class NewComparator implements Comparator<HMModel<String, String>>{
+	@Override
+	public int compare(HMModel<String, String> arg0, HMModel<String, String> arg1) {
+		double v0 = arg0.observeProbabilityInModel(), v1 = arg1.observeProbabilityInModel();
+		if(v0 > v1)
+			return -1;
+		if(v0 < v1)
+			return 1;
+		return 0;
+	}
+}
 
 public class Process {
-	private static String alph = "abcdefghijklmnopqrstuvwxyz";
-	//public static TrieTree TREE = new TrieTree().restoreTreeFromJar();
-	public static TrieTree TREE = TrieTree.restroreTree();
-	private static HashSet<String> knownEdit1(String word){
-		char st = word.charAt(0);
-		word = word.substring(1);
-		HashSet<String> res = new HashSet<String>();
-		ArrayList<Entry<String, String>> splits = new ArrayList<Entry<String, String>>(word.length() + 1);
-		for(int i = 0; i < word.length() + 1; i++)//split
-			splits.add(new SimpleEntry<String, String>(word.substring(0, i), word.substring(i)));
-		for(Entry<String, String> e : splits){
-			String a = e.getKey(), b = e.getValue(), temp = null;
-			if(b.length() > 0){//deletes & replaces
-				temp = a + b.substring(1);
-				if(TREE.getLegal(st + temp) != null)
-					res.add(st + temp);
-				for(int i = 0; i < 26; i++){
-					temp = a + alph.charAt(i) + b.substring(1);
-					if(TREE.getLegal(st + temp) != null)
-						res.add(st + temp);
-				}
-				if(b.length() > 1){//transpose
-					temp = a + b.charAt(1) + b.charAt(0) + b.substring(2);
-					if(TREE.getLegal(st + temp) != null)
-						res.add(st + temp);
-				}
-			}
-			for(int i = 0; i < 26; i++){//insert
-				temp = a + alph.charAt(i) + b;
-				if(TREE.getLegal(st + temp) != null)
-					res.add(st + temp);
-			}
+	private static boolean isFromJar = true;
+	private static TrieTree TREE = TrieTree.getInstance(false);
+	private static TransitionMatrixFromFile T_MATRIX = TransitionMatrixFromFile.getInstance(false);
+	private static ConfusionMatrixHere C_MATRIX = ConfusionMatrixHere.getInstance();
+    static Separator SEPARATOR = new PYSeparator(TREE);
+	private static int DEFAULT_2_CHAR_WORD_NUM = 7;
+	
+	public static boolean isFromJar(){
+		return Process.isFromJar;
+	}
+	static String list2String(List<String> l){
+		String ret = "";
+		for(String s : l){
+			ret += s;
 		}
-		return res;
+		return ret;
 	}
-	private static HashSet<String> knownEdits2(String word){
-		HashSet<String> res = new HashSet<String>();
-		HashSet<String> edit1Res = knownEdit1(word);
-		for(String s : edit1Res)
-			for(String ss : knownEdit1(s))
-				res.add(ss);
-		return res;
-	}
-	public static Iterator<Word> getCandidates(String py){
-		Iterator<Word> iter = TREE.get(py);
-		if(iter != null)
-			return iter;
+	
+	public static Iterator<String> getCandidates(List<String> pys){
+		int pyNum = pys.size();
+		String first = pys.get(0);
+		SortedList sl = TREE.get(first);
+		Iterator<Word> iter = sl.iterator();
+		ArrayList<String> chars1 = new ArrayList<String>();
+		ArrayList<Double> ps = new ArrayList<Double>();
+		while(iter.hasNext()){
+			Word w = iter.next();
+			int freq = w.getFrequency();
+			if(freq < 4)
+				break;
+			chars1.add("" + w.getWord());
+			ps.add((0.0 + freq)/(0.0 + T_MATRIX.getAllCharNum()));
+		}
 		
-		//debug
-		System.out.println("correcting");
+		//如果是单拼音输入
+		if(pys.size() == 1){
+			return chars1.iterator();
+		}
 		
-		HashSet<String> candidates = knownEdit1(py);
-		if(candidates.size() == 0){
-			candidates = knownEdits2(py);
-		}
-		if(candidates.size() == 0){
-			return null;
-		}
-		SortedList ret = new SortedList();
-		for(String s : candidates){
-			Iterator<Word> iter1 = TREE.get(s);
-			while(iter1.hasNext()){
-				ret.add(iter1.next());
+		//多拼音输入
+		PriorityQueue<HMModel<String, String>> pq = new PriorityQueue<HMModel<String, String>>(3, new NewComparator());
+		HMModel<String, String> nowModel = new HMModel<String, String>(Process.T_MATRIX, Process.C_MATRIX, ps, first, chars1.iterator());
+		for(int i = 1; i < pyNum; ++i){
+			String py = pys.get(i);
+			sl = TREE.get(py);
+			iter = sl.iterator();
+			ArrayList<String> chars = new ArrayList<String>();
+			while(iter.hasNext()){
+				Word w = iter.next();
+				if(w.getFrequency() < 4)
+					break;
+				chars.add("" + w.getWord());
+			}
+			nowModel.addLayer(py, chars.iterator());
+			if(i + 1 < pyNum){
+				pq.add(new HMModel<String, String>(nowModel));
 			}
 		}
-		return ret.iterator();
+		ArrayList<String> retl = new ArrayList<String>();
+		if(2 == pyNum){
+			PriorityQueue<LinkedList<String>> retpq = nowModel.rankedStatusPairsListIn2Layers();
+			int sz = retpq.size(), ceil = (sz < Process.DEFAULT_2_CHAR_WORD_NUM) ? sz : Process.DEFAULT_2_CHAR_WORD_NUM;
+			for(int num = 0; num < ceil; num++){
+				retl.add(Process.list2String(retpq.poll()));
+			}
+			retl.addAll(chars1);
+			return retl.iterator();
+		}
+		retl.add(Process.list2String(nowModel.bestStatusSequence()));
+		int pqsize = pq.size();
+		for(int num = 0; num < pqsize; num++){
+			HMModel<String, String> hmm = pq.poll();
+			
+			if(num == 0 && hmm.numOfLayer() == 2){
+				PriorityQueue<LinkedList<String>> retpq = hmm.rankedStatusPairsListIn2Layers();
+				int sz = retpq.size(), ceil = (sz < Process.DEFAULT_2_CHAR_WORD_NUM/2) ? sz : Process.DEFAULT_2_CHAR_WORD_NUM/2;
+				
+				for(int num1 = 0; num1 < ceil; num1++){
+					retl.add(Process.list2String(retpq.poll()));
+				}
+			}
+			else{
+				retl.add(Process.list2String(hmm.bestStatusSequence()));
+			}
+		}
+		
+		retl.addAll(chars1);
+		return retl.iterator();
 	}
+	
 	public static void main(String[] args){
-		Iterator<Word> it = Process.getCandidates("haw");
-		while(it.hasNext()){
-			Word w = it.next();
-			System.out.println(w);
-		}
+		System.out.println(Process.T_MATRIX.transitionProbability("喜", "还"));
+		System.out.println(Process.T_MATRIX.transitionProbability("喜", "欢"));
+		
 	}
 }

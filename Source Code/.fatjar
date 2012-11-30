@@ -1,10 +1,10 @@
 #Fat Jar Configuration File
-#Mon Oct 29 11:17:24 CST 2012
+#Tue Nov 20 22:48:49 CST 2012
 onejar.license.required=false
 manifest.classpath=
 manifest.removesigners=true
 onejar.checkbox=false
-jarname=C\:\\Users\\lxq\\Desktop\\LilyPinyinInputMethod.jar
+jarname=C\:\\Users\\lxq\\Desktop\\LilyPinyinInputMethodV2.0.jar
 manifest.mergeall=true
 manifest.mainclass=Running.CInputMehod
 manifest.file=<createnew>

@@ -10,7 +10,11 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.swing.AbstractAction;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -29,16 +33,16 @@ import javax.swing.text.Position;
 public class CInputMehod extends JPanel implements KeyListener, ListSelectionListener{  
   //
       
-    private static final long serialVersionUID = 1L;  
+    private static final long serialVersionUID = 1L; 
   
     public static void main(String args[]) throws Exception { 
     	CInputMehod plist = new CInputMehod(5);  
         
        
-        JFrame f = new JFrame("拼音输入法 v1.0");  
+        JFrame f = new JFrame("拼音输入法 v2.0");  
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         f.add(plist);          
-        f.setMinimumSize(new Dimension(380, 80));        
+        f.setMinimumSize(new Dimension(750, 200));        
 
         f.pack();  
         f.setVisible(true);  
@@ -102,7 +106,8 @@ public class CInputMehod extends JPanel implements KeyListener, ListSelectionLis
         this.list.setVisibleRowCount(1);    
         this.list.setMinimumSize(new Dimension(next.getSize()));
         prev.setEnabled(false);  
-        next.setEnabled(false);  
+        next.setEnabled(false);
+        preResult = "";
     }  
   
     private JPanel createControls() {     
@@ -144,7 +149,6 @@ public class CInputMehod extends JPanel implements KeyListener, ListSelectionLis
             page.addElement(model.getElementAt(i));  
         }  
         list.setModel(page);          
-
         final boolean canGoBack = currPageNum != 1;  
         final boolean canGoFwd = ((currPageNum != lastPageNum) && (lastPageNum > 0));  
         prev.setEnabled(canGoBack);  
@@ -158,24 +162,48 @@ public class CInputMehod extends JPanel implements KeyListener, ListSelectionLis
 		list.setSelectedIndex(e.getFirstIndex());
 		StringWriter sw = new StringWriter();
 		PrintWriter pw = new PrintWriter(sw);
-		   if (e.getValueIsAdjusting() == false) {		        
-		        	JList list = (JList)e.getSource();
-					int selections[] = list.getSelectedIndices();
-					Object selectionValues[] = list.getSelectedValues();
-					for(int i=0, n=selections.length; i<n; i++) {						
-						pw.print(((String)selectionValues[i]).charAt(3));
-					}
-					getTextArea().append(sw.toString());        		        
-		    }
-		   textField.setText("");
+		    
+//		   int num = resS.length();
+		   JList list = (JList)e.getSource();
+			int selections[] = list.getSelectedIndices();
+			Object selectionValues[] = list.getSelectedValues();
+			
+			for(int i=0, n=selections.length; i<n; i++) {		
+				   String toAdd = (String)selectionValues[i];
+					pw.print((toAdd.substring(3, toAdd.length() - 2)));
+			}
+		   String resS = sw.toString();
+		   
+		   
+		   int num = resS.length();
+		   
+		   if(num < PY_NUM){
+			   preResult += resS;
+			   textField.setText(preResult + Process.list2String(PYS.subList(num, PYS.size())));
+			   String inputStr = textField.getText();
+			   this.applyChanges(inputStr);
+			   
+		   }
+		   else{
+			   Pattern patt = Pattern.compile("[^A-Za-z0-9']+");
+			   Matcher m = patt.matcher(textField.getText());
+			   String preRes = "";
+			   while(m.find()){
+				   preRes += m.group();
+			   }
+			   getTextArea().append(preRes + resS);   
+			   textField.setText("");
+			   preResult = "";
+		   }
+		   
 //		   textArea.setCaretPosition(textArea.getDocument().getLength());
 //		   textField.selectAll();
 	}
 	
-	private void addAllElements(Iterator<Word> iter){
+	private void addAllElements(Iterator<String> iter){
 		int i = 0;
 		while(iter.hasNext()){
-			listContainer.add(((i++)%pageSize)+1 +  ". " + iter.next().getWord() + "     ");
+			listContainer.add(((i++)%pageSize)+1 +  ". " + iter.next() + "  ");
 		}
 	}
 
@@ -184,42 +212,11 @@ public class CInputMehod extends JPanel implements KeyListener, ListSelectionLis
 		// TODO Auto-generated method stub
 		
 	}
-
-	@Override
-	public void keyReleased(KeyEvent e) {
-		// TODO Auto-generated method stub
-		 listContainer.clear();
-		 String inputStr = textField.getText(); 
-		 if(!textField.getText().equals(e.getKeyChar()+"") && e.getKeyChar() >= '1' && e.getKeyChar() < '6'){	        	   
-//      	   System.out.println(e.getKeyChar());
-      	   int index = list.getNextMatch(e.getKeyChar()+"", 0, Position.Bias.Backward);
-//      	   System.out.println(index);
-      	   valueChanged(new ListSelectionEvent(list, index, index, false));	
-      	   inputStr = "";
+	private void applyChanges(String inputStr){
+		//查询得到拼音对应的汉字
+		 if(inputStr.length() > 0){
+			 this.addAllElements(Process.getCandidates(preProcessing(inputStr)));
 		 }
-		 else if(!textField.getText().equals(e.getKeyChar()+"") && e.getKeyChar() == ' '){	        	   
-//      	   System.out.println(e.getKeyChar());
-//      	   System.out.println(index);
-      	   valueChanged(new ListSelectionEvent(list, 0, 0, false));	
-      	   inputStr = "";
-		 }
-		 if(!textField.getText().equals(e.getKeyChar()+"") && e.getKeyChar() == '6'){
-			 if (++currPageNum > lastPageNum)  
-                 currPageNum = lastPageNum;  
-             updatePage();
-             textField.setText(inputStr.substring(0, inputStr.length() - 1));
-             return;
-		 }
-		 if(!textField.getText().equals(e.getKeyChar()+"") && e.getKeyChar() == '`'){
-			 if (--currPageNum <= 0)  
-                 currPageNum = 1;  
-             updatePage();
-             textField.setText(inputStr.substring(0, inputStr.length() - 1));
-             return;
-		 }
-		 //查询得到拼音对应的汉字
-		 if(inputStr.length() > 0)
-			 this.addAllElements(Process.getCandidates(inputStr));
 		//然后调用addAllElements
 		
 		 
@@ -234,11 +231,71 @@ public class CInputMehod extends JPanel implements KeyListener, ListSelectionLis
 	     this.currPageNum = 1;	     
 	     updatePage();  
 	}
+	private static LinkedList<String> preProcessing(String inputStr){
+		Pattern patt = Pattern.compile("[A-Za-z']+");
+		 Matcher m = patt.matcher(inputStr);
+		 String str = "";
+		 while(m.find()){
+			 str += m.group();
+		 }
+		 String[] strs = str.split("'");
+		 LinkedList<String> res = new LinkedList<String>();
+		 for(String s : strs){
+			 List<String> pys = Process.SEPARATOR.separate(s);
+			 res.addAll(pys);
+		 }
+		 PY_NUM = res.size();
+		 PYS = new LinkedList<String>(res);
+		 
+		 //debug
+//		 for(String s : res){
+//			 System.out.println("split:" + s);
+//		 }
+		 
+		 return res;
+	}
+	
+	static int PY_NUM;
+	static LinkedList<String> PYS;
+	static String preResult;
+	@Override
+	public void keyReleased(KeyEvent e) {
+		// TODO Auto-generated method stub
+		 listContainer.clear();
+		 String inputStr = textField.getText();
+		 if(e.getKeyCode() == KeyEvent.VK_PAGE_DOWN){
+			 if (++currPageNum > lastPageNum)  
+                 currPageNum = lastPageNum;  
+             updatePage();
+             return;
+		 }
+		 if(e.getKeyCode() == KeyEvent.VK_PAGE_UP){
+			 if (--currPageNum <= 0)  
+                 currPageNum = 1;  
+             updatePage();
+             return;
+		 }
+		 if(textField.getText() != null && (e.getKeyCode() == KeyEvent.VK_0 || e.getKeyCode() == KeyEvent.VK_1 || e.getKeyCode() == KeyEvent.VK_2 || 
+				 e.getKeyCode() == KeyEvent.VK_3 || e.getKeyCode() == KeyEvent.VK_4 || e.getKeyCode() == KeyEvent.VK_5)){
+			 //System.out.println(e.getKeyChar());
+	      	   int index = list.getNextMatch(e.getKeyChar()+"", 0, Position.Bias.Backward);
+//	      	   System.out.println(index);
+	      	   valueChanged(new ListSelectionEvent(list, index, index, true));	
+	      	   return;
+		 }
+		 else if(!textField.getText().equals(e.getKeyChar()+"") && e.getKeyChar() == ' '){	        	   
+//      	   System.out.println(e.getKeyChar());
+//      	   System.out.println(index);
+			 textField.setText(inputStr.substring(0, inputStr.length() - 1));
+      	   valueChanged(new ListSelectionEvent(list, 0, 0, false));	
+      	   inputStr = "";
+		 }
+		this.applyChanges(inputStr);
+	}
 
 	@Override
 	public void keyTyped(KeyEvent arg0) {
 		// TODO Auto-generated method stub
-		
 	}
 
 }  
